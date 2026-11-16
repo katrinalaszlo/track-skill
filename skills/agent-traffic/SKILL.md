@@ -63,6 +63,26 @@ curl -sS --fail-with-body -X POST https://alg.katrinalaszlo.com/v1/install-check
 
 On a `FAIL` line, fix what it says and repeat step 3. `WARN` lines are for the user.
 
+## Show the results
+
+When the user asks what the agents did, read it with the key; you do not need the dashboard or a sign-in. The key's workspace has one project, so no project id is needed:
+
+```sh
+curl -sS --fail-with-body "https://alg.katrinalaszlo.com/v1/traffic/paths?days=1" -H "Authorization: Bearer $(sed -n 's/^AGENT_TRAFFIC_KEY=//p' .env)"
+```
+
+It answers the most common paths agents took, where sessions ended, and `fix_next`: the errors that ended them, worst first. Tell the user what it says in plain words. Sessions are rebuilt at most once a minute, so a request you just sent can take a minute to appear. The other reports (`/v1/traffic/onboarding`, `/v1/traffic/coverage`, the MCP server at `/mcp`) are listed at https://alg.katrinalaszlo.com/llms.txt.
+
 ## Hand off
 
-End by showing the user the claim link: the last line of the install check (`Claim this workspace: <url> (link valid until <date> <time> UTC)`), or `grep '^# Claim this workspace' .env`. Tell them: open it, sign in or create an account, and choose "Add to my account" to keep this workspace, its projects and everything you did in their Track account; the key in `.env` keeps working after the claim and nothing changes for the server; the link works 7 days, and unclaimed nothing is deleted (they can also sign in at https://alg.katrinalaszlo.com/login with `AGENT_TRAFFIC_KEY`). If they say they claimed it, run `curl -sS --fail-with-body https://alg.katrinalaszlo.com/v1/claim -H "Authorization: Bearer $(sed -n 's/^AGENT_TRAFFIC_KEY=//p' .env)"` and confirm `"claimed": true`; if the link expired, `curl -sS --fail-with-body -X POST https://alg.katrinalaszlo.com/v1/claim-link -H "Authorization: Bearer $(sed -n 's/^AGENT_TRAFFIC_KEY=//p' .env)"` returns a new `claim_url`. Also tell them which field `accountIdOf` returns; that production needs `AGENT_TRAFFIC_KEY` and `AGENT_TRAFFIC_ACCOUNT_SALT` from `.env`, with the same salt everywhere (`AGENT_TRAFFIC_PROJECT_ID` is optional: the key already names its project); and that on serverless hosts (Vercel functions, Lambda) events can be lost when the process freezes after the response.
+End by showing the user the claim link: the last line of the install check (`Claim this workspace: <url> (link valid until <date> <time> UTC)`), or `grep '^# Claim this workspace' .env`. Tell them: open it, sign in or create an account, and choose "Add to my account" to keep this workspace, its projects and everything you did in their Track account; the key in `.env` keeps working after the claim and nothing changes for the server; the link works 7 days, and unclaimed nothing is deleted. The person never needs the key from you: the claim link is how they get in, with their own account. Do not print the key for them and do not type it into a sign-in page yourself. If they would rather not make an account, they can copy `AGENT_TRAFFIC_KEY` out of `.env` themselves and paste it at https://alg.katrinalaszlo.com/login. If they say they claimed it, run `curl -sS --fail-with-body https://alg.katrinalaszlo.com/v1/claim -H "Authorization: Bearer $(sed -n 's/^AGENT_TRAFFIC_KEY=//p' .env)"` and confirm `"claimed": true`; if the link expired, `curl -sS --fail-with-body -X POST https://alg.katrinalaszlo.com/v1/claim-link -H "Authorization: Bearer $(sed -n 's/^AGENT_TRAFFIC_KEY=//p' .env)"` returns a new `claim_url`. Also tell them which field `accountIdOf` returns; that production needs `AGENT_TRAFFIC_KEY` and `AGENT_TRAFFIC_ACCOUNT_SALT` from `.env`, with the same salt everywhere (`AGENT_TRAFFIC_PROJECT_ID` is optional: the key already names its project); and that on serverless hosts (Vercel functions, Lambda) events can be lost when the process freezes after the response.
+
+## Undo
+
+If this was a trial, or the user wants it gone, delete the workspace you made instead of leaving it: remove the two lines of code and the package, then
+
+```sh
+curl -sS --fail-with-body -X DELETE https://alg.katrinalaszlo.com/v1/workspace -H "Authorization: Bearer $(sed -n 's/^AGENT_TRAFFIC_KEY=//p' .env)"
+```
+
+It deletes nothing yet: it answers `400 confirmation_required` with the workspace id and the exact JSON body to send. Send the same request again with `-H "Content-Type: application/json" -d '<that body>'` and it deletes the workspace, its events and the key. Then remove the `AGENT_TRAFFIC_*` lines from `.env`. It cannot be undone, so ask the user first. Once a person has claimed the workspace it is theirs and this answers `409 workspace_claimed`.

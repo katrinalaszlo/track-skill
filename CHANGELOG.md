@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.6 (2026-11-16)
+
+Install skill only; the middleware is unchanged. From a cold-start run where an agent followed the skill with nothing but the public site:
+
+- New "Show the results" step: the agent reads `GET /v1/traffic/paths` with the key and tells the user what it says. The skill used to stop at the claim link, so an agent given only the skill never learned it could read the reports.
+- Hand-off: the person gets in with the claim link and their own account. The skill no longer tells the agent the person can sign in with the key without saying who handles the key; the agent never prints it and never types it into a sign-in page.
+- New "Undo" step: `DELETE /v1/workspace` removes a workspace the agent made (a trial, a wrong install), so test runs stop leaving workspaces behind.
+
 ## 0.7.5 (2026-10-24)
 
 Install skill only; the middleware is unchanged. Every curl in the skill now prints Track's JSON error instead of hiding it (`--fail-with-body` instead of `-f`), so the agent sees `next_step` and `resolved_by`; the signup command writes to a temp file first so an error never lands in `.env`. The claim link line shows its expiry time in UTC.
