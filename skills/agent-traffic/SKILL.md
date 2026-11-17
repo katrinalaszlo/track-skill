@@ -1,6 +1,6 @@
 ---
 name: agent-traffic
-description: Install Track (agent traffic analytics) into a Node/Express API, so the API owner can see which AI agents call their API, which sessions fail, and where. Use when asked to add Track, agent traffic or agent analytics to an API.
+description: Install Track (agent traffic analytics) into an API (Express, Fastify, FastAPI, Starlette, or another framework), so the API owner can see which AI agents call their API, which sessions fail, and where. Use when asked to add Track, agent traffic or agent analytics to an API.
 ---
 
 # Install Track
@@ -55,7 +55,7 @@ Optional, off by default, and only if the user asks for it: `issueJourneyKeys: t
 
 Each of these sends the same event the Express middleware sends: the same name for the same route, the same redacted path, the same hashes. Show the user the file you add; it is short and has no dependency beyond what is named.
 
-**Fastify.** Install `@katrinalaszlo/track` as above, then fetch the adapter (about 45 lines; it hands Fastify's request to the package's middleware) and add two lines before the routes are registered:
+**Fastify.** Install `@katrinalaszlo/track` as above, then fetch the adapter (about 50 lines; it hands Fastify's request to the package's middleware) and add two lines before the routes are registered:
 
 ```sh
 curl -sS --fail-with-body https://alg.katrinalaszlo.com/skill/fastify.cjs -o track-fastify.cjs
@@ -66,7 +66,7 @@ const { trackFastify } = require("./track-fastify.cjs"); // or: import { trackFa
 trackFastify(fastify, { accountIdOf: (request) => request.user?.id });
 ```
 
-`accountIdOf(request)` gets the Fastify request after the auth hooks ran. Everything under Express above applies (the options are the same), except the proxy setting: Fastify's is the `trustProxy` option of `fastify({ trustProxy: true })`.
+`accountIdOf(request)` gets the Fastify request after the auth hooks ran: return the customer id they resolved (`request.user?.id`, or wherever this app puts it), by the same rule as under Express above. The optional settings under Express apply too, with two differences. `errorOf` and `pathOf` get the wrapped request: the Fastify request is `req.fastify`, so the route pattern is `pathOf: (req) => req.fastify.routeOptions.url` and an error code your handler stored is `errorOf: (req) => req.fastify.errorCode` (set `request.errorCode` where the handler sends the error). The proxy setting is Fastify's `trustProxy` option, `fastify({ trustProxy: true })`, not Express's `trust proxy`.
 
 **FastAPI or Starlette.** No package. Fetch one file (standard library only) and add the middleware:
 
@@ -104,10 +104,10 @@ On a `FAIL` line, fix what it says and repeat step 3. `WARN` lines are for the u
 When the user asks what the agents did, read it with the key; you do not need the dashboard or a sign-in. The key's workspace has one project, so no project id is needed:
 
 ```sh
-curl -sS --fail-with-body "https://alg.katrinalaszlo.com/v1/traffic/paths?days=1" -H "Authorization: Bearer $(sed -n 's/^AGENT_TRAFFIC_KEY=//p' .env)"
+curl -sS --fail-with-body "https://alg.katrinalaszlo.com/v1/traffic/paths?days=1&format=text" -H "Authorization: Bearer $(sed -n 's/^AGENT_TRAFFIC_KEY=//p' .env)"
 ```
 
-It answers the most common paths agents took, where sessions ended, and `fix_next`: the errors that ended them, worst first. Tell the user what it says in plain words. Sessions are rebuilt at most once a minute, so a request you just sent can take a minute to appear. The other reports (`/v1/traffic/onboarding`, `/v1/traffic/coverage`, the MCP server at `/mcp`) are listed at https://alg.katrinalaszlo.com/llms.txt.
+It answers one page of plain text: who came, every error response agents got, the errors that ended a session (fix those first), and the most common paths. Tell the user what it says in plain words. The same URL without `format=text` is the full report as JSON, which is long. Sessions are rebuilt at most once a minute, so a request you just sent can take a minute to appear. The other reports (`/v1/traffic/onboarding`, `/v1/traffic/coverage`, the MCP server at `/mcp`) are listed at https://alg.katrinalaszlo.com/llms.txt.
 
 ## Hand off
 

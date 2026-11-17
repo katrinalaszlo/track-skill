@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.8 (2026-11-17)
+
+Install skill only. From a second round of cold-start runs (Codex on FastAPI, Claude on Fastify), which both passed with no code of the agent's own:
+
+- "Show the results" fetches the one-page text report (`format=text`) instead of the full JSON, which was 38 KB for 13 events.
+- The skill's description names the frameworks it covers instead of "a Node/Express API".
+- The Fastify part says how `errorOf` and `pathOf` reach the Fastify request, instead of leaving the agent to translate the Express examples.
+
 ## 0.7.7 (2026-11-17)
 
 Install skill and two new recipe files; the middleware is unchanged.

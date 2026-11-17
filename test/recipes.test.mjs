@@ -151,6 +151,33 @@ describe("Fastify recipe hands requests to the Express middleware", () => {
     });
   });
 
+  test("pathOf and errorOf reach the Fastify request as req.fastify, as SKILL.md says", async () => {
+    const sent = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (url, init) => {
+      const batch = JSON.parse(init.body);
+      sent.push(...batch);
+      return new Response(JSON.stringify({ accepted: batch.length, rejected: [] }), { status: 202, headers: { "content-type": "application/json" } });
+    };
+    try {
+      let hook;
+      const { trackFastify } = require("../skills/agent-traffic/recipes/fastify.cjs");
+      trackFastify({ addHook: (name, fn) => { hook = fn; } }, {
+        key: "ark_ws_fake", salt: "salt", endpoint: "https://ingest.test",
+        pathOf: (req) => req.fastify.routeOptions.url,
+        errorOf: (req) => req.fastify.errorCode,
+      });
+      const raw = Object.assign(new EventEmitter(), { statusCode: 402, getHeader: () => undefined, setHeader: () => {} });
+      const request = { method: "POST", headers: {}, raw: { url: "/invite/abc123", socket: {} }, protocol: "http", ip: "203.0.113.7", is404: false, routeOptions: { url: "/invite/:code" } };
+      hook(request, { raw }, () => { request.errorCode = "card_declined"; });
+      raw.emit("finish");
+      await flushed();
+      assert.deepEqual(sent.map((e) => [e.name, e.path, e.properties.status_code, e.properties.error]), [["invite_code_post", "/invite/:code", 402, "card_declined"]]);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
   test("a response that emits finish twice (fastify.inject does) still sends one event", async () => {
     const sent = [];
     const realFetch = globalThis.fetch;
