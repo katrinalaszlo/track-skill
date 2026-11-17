@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.7 (2026-11-17)
+
+Install skill and two new recipe files; the middleware is unchanged.
+
+Four cold-start runs from the homepage prompt (Codex and Claude; Express, Fastify, FastAPI) showed the skill working on Express and telling the agent to stop on everything else. The agents that carried on wrote 96 and 170 lines of their own, each choosing its own event names.
+
+- The skill no longer says to stop for a stack other than Express. Steps 1 and 3, Show the results, Hand off and Undo are the same everywhere; step 2 now has a part per framework.
+- `skills/agent-traffic/recipes/fastify.cjs`: an adapter of about 45 lines that hands Fastify's request and reply to the package's own middleware, so names, redaction, hashing, batching and retries are the package's.
+- `skills/agent-traffic/recipes/fastapi.py`: an ASGI middleware for FastAPI and Starlette, standard library only. Tests compare its event names, redacted paths, `ip_hash` and `account_id` with the Express middleware's for the same inputs.
+
 ## 0.7.6 (2026-11-16)
 
 Install skill only; the middleware is unchanged. From a cold-start run where an agent followed the skill with nothing but the public site:

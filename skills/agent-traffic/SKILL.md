@@ -5,7 +5,7 @@ description: Install Track (agent traffic analytics) into a Node/Express API, so
 
 # Install Track
 
-Three steps: a key, one package and two lines of code, and a check. Done means the check in step 3 says `RESULT: PASS`. Never print the key or salt: the commands below write them to `.env` without showing them. Covers Node 18+ with Express; for another stack, stop and point the user to https://alg.katrinalaszlo.com/docs.md.
+Three steps: a key, one package and two lines of code, and a check. Done means the check in step 3 says `RESULT: PASS`. Never print the key or salt: the commands below write them to `.env` without showing them. Steps 1 and 3, Show the results, Hand off and Undo are the same for every stack; only step 2 depends on the framework. Step 2 covers Node 18+ with Express, then Fastify, FastAPI or Starlette, and any other stack. Do not stop because the API is not Express.
 
 ## What this installs
 
@@ -25,6 +25,10 @@ grep -qx ".env" .gitignore 2>/dev/null || echo ".env" >> .gitignore
 ```
 
 ## 2. Add the middleware
+
+Pick the part for this API's framework: Express (the rest of this section), or Fastify, FastAPI and Starlette, or anything else, under "Other stacks" at the end of this step. The one decision is the same everywhere: which field identifies the customer.
+
+### Express
 
 Install the `@katrinalaszlo/track` package in the API's package, with the project's package manager (`npm install @katrinalaszlo/track`, `pnpm add @katrinalaszlo/track`, `yarn add @katrinalaszlo/track`; in a monorepo, in the API's workspace). It ships TypeScript types.
 
@@ -46,6 +50,38 @@ Optional: if a route puts a secret in the path in a shape the default redaction 
 Optional, offer it once and do it only if the user says yes: keep the middleware in a variable (`const traffic = agentTraffic({...}); app.use(traffic);`) and, in the signup handler and the payment webhook handler, call `await traffic.recordOutcome({ accountId: <the same id accountIdOf returns>, name: "signup", idempotencyKey: <the new account's id> })` and `await traffic.recordOutcome({ accountId, name: "paid", value: <whole minor units, 1999 for $19.99>, currency: "USD", idempotencyKey: <the payment event id> })`. The dashboard then shows which class of agent led to signups and revenue.
 
 Optional, off by default, and only if the user asks for it: `issueJourneyKeys: true` gives each visitor a journey key so its requests across sessions show as one journey. It sets a `track_j` cookie (14 days, `Secure`, `SameSite=Lax`, `HttpOnly`), a `Track-Journey` response header and `Cache-Control: private` on every response, so a shared cache never serves one visitor's key to another. Tell the user that is a new cookie (their cookie policy may need to mention it) and that a CDN stops caching those responses; that is why it is opt-in.
+
+### Other stacks
+
+Each of these sends the same event the Express middleware sends: the same name for the same route, the same redacted path, the same hashes. Show the user the file you add; it is short and has no dependency beyond what is named.
+
+**Fastify.** Install `@katrinalaszlo/track` as above, then fetch the adapter (about 45 lines; it hands Fastify's request to the package's middleware) and add two lines before the routes are registered:
+
+```sh
+curl -sS --fail-with-body https://alg.katrinalaszlo.com/skill/fastify.cjs -o track-fastify.cjs
+```
+
+```js
+const { trackFastify } = require("./track-fastify.cjs"); // or: import { trackFastify } from "./track-fastify.cjs";
+trackFastify(fastify, { accountIdOf: (request) => request.user?.id });
+```
+
+`accountIdOf(request)` gets the Fastify request after the auth hooks ran. Everything under Express above applies (the options are the same), except the proxy setting: Fastify's is the `trustProxy` option of `fastify({ trustProxy: true })`.
+
+**FastAPI or Starlette.** No package. Fetch one file (standard library only) and add the middleware:
+
+```sh
+curl -sS --fail-with-body https://alg.katrinalaszlo.com/skill/fastapi.py -o track.py
+```
+
+```python
+from track import TrackMiddleware
+app.add_middleware(TrackMiddleware, account_id_of=lambda scope: scope.get("state", {}).get("account_id"))
+```
+
+Then, in the dependency or middleware that authenticates a request, add one line where the customer is known: `request.state.account_id = user.id` (whatever id this app's auth resolves). It reads `AGENT_TRAFFIC_KEY` and `AGENT_TRAFFIC_ACCOUNT_SALT` from the environment or `.env` by itself. Behind a proxy, start the server so it trusts forwarded headers (`uvicorn --proxy-headers`), or every request hashes the proxy's IP.
+
+**Any other stack.** There is no file to copy yet. Send one event per request from the hook that runs after the response, to `POST https://alg.katrinalaszlo.com/v1/events` with `Authorization: Bearer <AGENT_TRAFFIC_KEY>`, built as the table "Each event it sends" in https://alg.katrinalaszlo.com/docs.md describes (search that page for "Example: Express middleware"). Use `fastapi.py` above as the reference: it is the whole thing in about 240 lines of standard-library Python, and the name, path, `account_id` and `ip_hash` rules in it are the ones to port. Tell the user this part is hand-written for their stack before you write it.
 
 ## 3. Check
 
@@ -79,7 +115,7 @@ End by showing the user the claim link: the last line of the install check (`Cla
 
 ## Undo
 
-If this was a trial, or the user wants it gone, delete the workspace you made instead of leaving it: remove the two lines of code and the package, then
+If this was a trial, or the user wants it gone, delete the workspace you made instead of leaving it: remove the lines of code you added, the package, and any file fetched in step 2 (`track-fastify.cjs`, `track.py`), then
 
 ```sh
 curl -sS --fail-with-body -X DELETE https://alg.katrinalaszlo.com/v1/workspace -H "Authorization: Bearer $(sed -n 's/^AGENT_TRAFFIC_KEY=//p' .env)"
